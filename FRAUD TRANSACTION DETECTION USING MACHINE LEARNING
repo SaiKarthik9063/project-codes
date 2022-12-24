@@ -1,0 +1,172 @@
+
+""" BUILDING THE FRAUD TRANSACTION DETECTION MODEL USING DEEP LEARNING -CNN"""
+
+"""IMPORTING THE LIBRARIES INTO THE GOOGLE COLAB"""
+
+import tensorflow as tf
+from tensorflow import keras
+from keras import Sequential
+from tensorflow.keras.optimizers import Adam
+from keras.layers import Flatten, Dense, Dropout, BatchNormalization
+from keras.layers import Conv1D, MaxPool1D
+
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt 
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import classification_report,accuracy_score
+#importing the dataset in google colab
+from google.colab import files
+uploaded = files.upload()
+import io 
+data = pd.read_csv(io.BytesIO(uploaded['creditcard.csv']))
+data.shape
+#output:
+#(284807, 31)
+data.isnull().sum()
+#Time      0
+#V1        0
+#V2        0....
+data.info()
+#checking the no of fraud and non-fraud transactions
+data['Class'].value_counts()[:]
+"""0    284315
+1       492
+Name: Class, dtype: int64"""
+non_fraud=data[data['Class']==0]
+fraud=data[data['Class']==1]
+non_fraud.shape, fraud.shape
+#making non-fraud sample length equal to fraud sample length
+non_fraud=non_fraud.sample(fraud.shape[0])
+non_fraud.shape
+data=fraud.append(non_fraud, ignore_index=True)
+data
+data.Class.value_counts()
+"""1    492
+0    492
+Name: Class, dtype: int64"""
+
+#spliting the data into x and y where y implies the class of dataset
+X=data.drop(['Class'], axis=1)
+y=data.Class
+X.shape, y.shape
+
+#spliting the data into training and testing sampples where testing as 20% of the data 
+X_train,X_test,y_train,y_test=train_test_split(X,y,test_size=0.2,random_state=99)
+X_train.shape,X_test.shape,y_train.shape,y_test.shape
+X_train
+
+#As data is varied we scale the data using scaler method
+scaler=StandardScaler()
+X_train=scaler.fit_transform(X_train)
+X_test=scaler.fit_transform(X_test)
+X_train,y_train
+
+#changing the y to array form
+y_train=y_train.to_numpy()
+y_test=y_test.to_numpy()
+
+
+#reshaping the data into 3D format
+X_train=X_train.reshape(X_train.shape[0],X_train.shape[1],1)
+X_test=X_test.reshape(X_test.shape[0],X_test.shape[1],1)
+X_train.shape, X_test.shape
+#output:((787, 30, 1), (197, 30, 1))
+
+
+#building the CNN model
+model=Sequential()
+#first layer
+model.add(Conv1D(filters=32, kernel_size=2, activation='relu', input_shape=X_train[0].shape))
+model.add(BatchNormalization())
+model.add(Dropout(0.2))
+#second layer
+model.add(Conv1D(filters=64, kernel_size=2, activation='relu'))
+model.add(BatchNormalization())
+model.add(Dropout(0.2))
+#third layer
+model.add(Flatten())
+model.add(Dense(64, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(1, activation='relu'))
+model.summary()
+from keras.utils import plot_model
+plot_model(model)
+
+
+#Compiling
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+
+#Building the epochs
+history=model.fit(X_train,y_train,epochs=20,validation_data=(X_test,y_test))
+
+
+#Plotting the graph of accuracy vs epoch and loss vs epoch
+def plot_learningcurve(history,epochs):
+  epoch=range(1,epochs+1)
+  # accuracy
+  plt.plot(epoch, history.history['accuracy'])
+  plt.plot(epoch, history.history['val_accuracy'])
+  plt.title('Model accuracy')
+  plt.xlabel('epoch')
+  plt.ylabel('accuracy')
+  plt.legend(['train','val'], loc='upper left')
+  plt.show()
+
+  # loss
+  plt.plot(epoch, history.history['loss'])
+  plt.plot(epoch, history.history['val_loss'])
+  plt.title('Model loss')
+  plt.xlabel('epoch')
+  plt.ylabel('loss')
+  plt.legend(['train','val'], loc='upper left')
+  plt.show()
+  plot_learningcurve(history,20)
+  
+  
+#Building MAXPOOL model
+  epochs = 80
+model = Sequential()
+model.add(Conv1D(64,2,activation = 'relu',input_shape = X_train[0].shape))
+model.add(BatchNormalization())
+model.add(MaxPool1D(2))
+model.add(Dropout(0.2))
+# SECOND LAYER
+model.add(Conv1D(128,2,activation = 'relu'))
+model.add(BatchNormalization())
+model.add(MaxPool1D(2))
+model.add(Dropout(0.5))
+
+# Flattening the layer ( multidimentional data into vector)
+model.add(Flatten())
+model.add(Dense(128,activation = 'relu'))
+model.add(Dropout(0.5))
+
+# FINAL LAYER
+model.add(Dense(1,activation='sigmoid'))
+model.summary()
+#compiling and building epochs
+model.compile(optimizer = Adam(lr=0.0001),loss = 'binary_crossentropy',metrics=['accuracy'])
+history = model.fit(X_train, y_train, epochs = epochs,validation_data = (X_test,y_test),verbose = 1)
+
+
+#Plotting the graph
+plot_learningcurve(history,epochs)
+
+#Building the confusion matrix
+
+from sklearn.metrics import confusion_matrix,classification_report
+p_pred = model.predict(X_test)
+p_pred = p_pred.flatten()
+print(p_pred.round(2))
+y_pred = np.where(p_pred > 0.5, 1, 0)
+print(y_pred)
+print(confusion_matrix(y_test, y_pred))
+print(classification_report(y_test, y_pred))
+
+#Printing the validation accuracy
+accuracy_score(y_test, y_pred)
